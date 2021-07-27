@@ -13,7 +13,7 @@ use rust_gpu_tools::*;
 use std::any::TypeId;
 use std::sync::Arc;
 use std::time::Instant;
-use chrono::prelude::*;
+// use chrono::prelude::*;
 
 const MAX_WINDOW_SIZE: usize = 10;
 const LOCAL_WORK_SIZE: usize = 256;
@@ -112,7 +112,7 @@ where
         let best_n = calc_best_chunk_size(MAX_WINDOW_SIZE, core_count, exp_bits); // 14977997
         let n = std::cmp::min(max_n, best_n);
 
-        // println!("exp_bits:{:?}, core_count:{:?}, mem:{:?}, max_n:{:?}, best_n:{:?}, n:{:?}", exp_bits, core_count, mem, max_n, best_n, n);
+        println!("exp_bits:{:?}, core_count:{:?}, mem:{:?}, max_n:{:?}, best_n:{:?}, n:{:?}", exp_bits, core_count, mem, max_n, best_n, n);
 
         Ok(SingleMultiexpKernel {
             program: opencl::Program::from_opencl(d, &src)?,
@@ -136,16 +136,16 @@ where
             return Err(GPUError::GPUTaken);
         }
         // debug
-        let ready_time = Instant::now();
-        let work_start: DateTime<Utc> = Utc::now();
-        println!("[2-gpu/multiexp.rs] {:?}, Work Start", work_start);
+        // let ready_time = Instant::now();
+        // let work_start: DateTime<Utc> = Utc::now();
+        // println!("[2-gpu/multiexp.rs] {:?}, Work Start", work_start);
 
         let exp_bits = exp_size::<E>() * 8;
         let window_size = calc_window_size(n as usize, exp_bits, self.core_count);
         let num_windows = ((exp_bits as f64) / (window_size as f64)).ceil() as usize;
         let num_groups = calc_num_groups(self.core_count, num_windows);
         let bucket_len = 1 << window_size;
-        println!("exp_bits: {:?}, n: {:?}, window_size: {:?}, num_windows:{:?}, num_groups:{:?}, bucket_len: {:?}\n", exp_bits, n, window_size, num_windows, num_groups, bucket_len);
+        // println!("exp_bits: {:?}, n: {:?}, window_size: {:?}, num_windows:{:?}, num_groups:{:?}, bucket_len: {:?}\n", exp_bits, n, window_size, num_windows, num_groups, bucket_len);
 
         // Each group will have `num_windows` threads and as there are `num_groups` groups, there will
         // be `num_groups` * `num_windows` threads in total.
@@ -183,10 +183,10 @@ where
         );
 
         // debug
-        println!("[2-gpu/multiexp.rs] PreWorkTime: {}us", ready_time.elapsed().as_micros());
+        // println!("[2-gpu/multiexp.rs] PreWorkTime: {}us", ready_time.elapsed().as_micros());
         
         // debug
-        let work_time1 = Instant::now();
+        // let work_time1 = Instant::now();
 
         kernel
             .arg(&base_buffer)
@@ -202,9 +202,9 @@ where
 
         // println!(">>>> GPU work spent: {} us.", work_time1.elapsed().as_micros());
         // work-1
-        println!("[2-gpu/multiexp.rs] WorkTime: work-1: {}us.", work_time1.elapsed().as_micros());
+        // println!("[2-gpu/multiexp.rs] WorkTime: work-1: {}us.", work_time1.elapsed().as_micros());
         // work-2
-        let work_time2 = Instant::now();
+        // let work_time2 = Instant::now();
 
         let mut results = vec![<G as CurveAffine>::Projective::zero(); num_groups * num_windows];
         result_buffer.read_into(0, &mut results)?;
@@ -214,9 +214,9 @@ where
         let mut acc = <G as CurveAffine>::Projective::zero();
         let mut bits = 0;
 
-        println!("[2-gpu/multiexp.rs] WorkTime: work-2: {}us.", work_time2.elapsed().as_micros());
+        // println!("[2-gpu/multiexp.rs] WorkTime: work-2: {}us.", work_time2.elapsed().as_micros());
 
-        let work_time3 = Instant::now();
+        // let work_time3 = Instant::now();
 
         for i in 0..num_windows {
             let w = std::cmp::min(window_size, exp_bits - bits);
@@ -229,10 +229,10 @@ where
             bits += w; // Process the next window
         }
 
-        println!("[2-gpu/multiexp.rs] WorkTime: work-3: {}us.", work_time3.elapsed().as_micros());
+        // println!("[2-gpu/multiexp.rs] WorkTime: work-3: {}us.", work_time3.elapsed().as_micros());
 
-        let gpu_done: DateTime<Utc> = Utc::now();
-        println!("[2-gpu/multiexp.rs] {:?} Work Done.\n", gpu_done); 
+        // let gpu_done: DateTime<Utc> = Utc::now();
+        // println!("[2-gpu/multiexp.rs] {:?} Work Done.\n", gpu_done); 
 
         Ok(acc)
     }

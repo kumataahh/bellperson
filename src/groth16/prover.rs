@@ -6,6 +6,7 @@ use ff::{Field, PrimeField};
 use groupy::{CurveAffine, CurveProjective};
 use rand_core::RngCore;
 use rayon::prelude::*;
+// use chrono::prelude::*; // debug
 
 use super::{ParameterSource, Proof};
 use crate::domain::{EvaluationDomain, Scalar};
@@ -275,10 +276,42 @@ where
 {
     info!("Bellperson {} is being used!", BELLMAN_VERSION);
 
+    // debug
+    // let utc_circuits_start: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] circuits start.. \n", utc_circuits_start); 
+
     // Preparing things for the proofs is done a lot in parallel with the help of Rayon. Make
     // sure that those things run on the correct thread pool.
+    // debug
+    let now = Instant::now();
     let (start, mut provers, input_assignments, aux_assignments) =
         THREAD_POOL.install(|| create_proof_batch_priority_inner(circuits))?;
+    println!("[DEBUG-prover.rs] circuit spent: {}", now.elapsed().as_millis());
+    // debug
+    // let utc_circuits_end: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] circuits end.. \n", utc_circuits_end); 
+
+    // debug
+    print!("[DEBUG-prover.rs]\n");
+    println!("input_assignments len = {:?}", input_assignments.len());
+    print!("[");
+    for index in 0..input_assignments.len() {
+        print!("[{:?}]",  input_assignments[index].len())
+    }
+    print!("]");
+    println!("");
+
+    print!("[DEBUG-prover.rs]\n");
+    println!("aux_assignments len = {:?}", aux_assignments.len());
+    print!("[");
+    for index in 0..aux_assignments.len() {
+        print!("[{:?}]", aux_assignments[index].len())
+    }
+    print!("]");
+    println!("");
+
+
+
 
     // The rest of the proving also has parallelism, but not on the outer loops, but within e.g. the
     // multiexp calculations. This is what the `Worker` is used for. It is important that calling
@@ -311,6 +344,11 @@ where
     };
 
     let mut fft_kern = Some(LockedFFTKernel::<E>::new(log_d, priority));
+
+    // debug fft
+    // let utc_as_start: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] fft start.. \n", utc_as_start); 
+    let now = Instant::now();
 
     let a_s = provers
         .iter_mut()
@@ -345,8 +383,31 @@ where
         })
         .collect::<Result<Vec<_>, SynthesisError>>()?;
 
+
+    // debug
+    print!("[DEBUG-prover.rs]\n");
+    println!("a_s len = {:?}", a_s.len());
+    print!("[");
+    for index in 0..a_s.len() {
+        print!("[{:?}]", a_s[index].len())
+    }
+    print!("]");
+    println!("");
+
     drop(fft_kern);
+
+    // debug fft
+    println!("[DEBUG-prover.rs] fft spent: {}", now.elapsed().as_millis());
+    // let utc_as_end: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] fft end. \n", utc_as_end);  
+
+
     let mut multiexp_kern = Some(LockedMultiexpKernel::<E>::new(log_d, priority));
+
+    // debug.hs
+    let now = Instant::now();
+    // let utc_hs_start: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] h_s start.. \n", utc_hs_start);  
 
     let h_s = a_s
         .into_iter()
@@ -362,6 +423,16 @@ where
         })
         .collect::<Result<Vec<_>, SynthesisError>>()?;
 
+    // debug h_s
+    println!("[DEBUG-prover.rs] h_s spent: {}", now.elapsed().as_millis());
+    // let utc_hs_end: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] h_s end. \n", utc_hs_end);  
+
+    // let utc_ls_start: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] l_s start.. \n", utc_ls_start);  
+    // debug l_s
+    let now = Instant::now();
+
     let l_s = aux_assignments
         .iter()
         .map(|aux_assignment| {
@@ -376,12 +447,24 @@ where
         })
         .collect::<Result<Vec<_>, SynthesisError>>()?;
 
+    // debug ls
+    println!("[DEBUG-prover.rs] l_s spent: {}", now.elapsed().as_millis());
+    // let utc_ls_end: DateTime<Utc> = Utc::now();
+    // println!("Now Time: {:?}, [DEBUG-prover.rs] l_s end. \n", utc_ls_end);  
+
+    // debug ab_clac 2case 
+    let now = Instant::now();
+
     let inputs = provers
         .into_iter()
         .zip(input_assignments.iter())
         .zip(aux_assignments.iter())
         .map(|((prover, input_assignment), aux_assignment)| {
+            // debug
+            // print!("[DEBUG-3-prover.rs] input_assignments.len: {:?}\n", input_assignments.len());
+            // print!("[DEBUG-3-prover.rs] aux_assignments.len: {:?}\n", aux_assignments.len());
             let a_aux_density_total = prover.a_aux_density.get_total_density();
+            // print!("[DEBUG-prover-densityCount] a_aux_density_total: {:?}\n", a_aux_density_total);
 
             let (a_inputs_source, a_aux_source) =
                 params.get_a(input_assignment.len(), a_aux_density_total)?;
@@ -406,6 +489,9 @@ where
             let b_input_density_total = b_input_density.get_total_density();
             let b_aux_density = Arc::new(prover.b_aux_density);
             let b_aux_density_total = b_aux_density.get_total_density();
+            // debug
+            // print!("[DEBUG-prover-densityCount] b_input_density_total: {:?}\n", b_input_density_total);
+            // print!("[DEBUG-prover-densityCount] b_aux_density_total: {:?}\n", b_aux_density_total);
 
             let (b_g1_inputs_source, b_g1_aux_source) =
                 params.get_b_g1(b_input_density_total, b_aux_density_total)?;
@@ -455,6 +541,9 @@ where
         })
         .collect::<Result<Vec<_>, SynthesisError>>()?;
     drop(multiexp_kern);
+
+    // debug ab_clac(2 case)
+    println!("[DEBUG-prover.rs] ab_clac spent: {}", now.elapsed().as_millis());
 
     let proofs = h_s
         .into_iter()
