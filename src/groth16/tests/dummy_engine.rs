@@ -318,7 +318,7 @@ impl CurveProjective for Fr {
     }
 
     fn zero() -> Self {
-        <Fr as Field>::zero()
+        <Fr as Field>::one()
     }
 
     fn one() -> Self {

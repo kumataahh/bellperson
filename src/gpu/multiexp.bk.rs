@@ -107,12 +107,13 @@ where
 
         let exp_bits = exp_size::<E>() * 8;          // 256
         let core_count = utils::get_core_count(&d);  // 8704
-        let mem = d.memory();                        // 10,504,699,904
-        let max_n = calc_chunk_size::<E>(mem, core_count);       // 2069933
+        let mem = d.memory();                        // 10504699904
+        // let max_n = calc_chunk_size::<E>(mem, core_count);       // 2069933
+        let max_n = 8388608;
         let best_n = calc_best_chunk_size(MAX_WINDOW_SIZE, core_count, exp_bits); // 14977997
         let n = std::cmp::min(max_n, best_n);
 
-        // println!("exp_bits:{:?}, core_count:{:?}, mem:{:?}, max_n:{:?}, best_n:{:?}, n:{:?}", exp_bits, core_count, mem, max_n, best_n, n);
+        println!("exp_bits:{:?}, core_count:{:?}, mem:{:?}, max_n:{:?}, best_n:{:?}, n:{:?}", exp_bits, core_count, mem, max_n, best_n, n);
 
         Ok(SingleMultiexpKernel {
             program: opencl::Program::from_opencl(d, &src)?,
@@ -135,7 +136,7 @@ where
         if locks::PriorityLock::should_break(self.priority) {
             return Err(GPUError::GPUTaken);
         }
-        // pre-work start
+        // debug
         let ready_time = Instant::now();
         let work_start: DateTime<Utc> = Utc::now();
         println!("[2-gpu/multiexp.rs] {:?}, Work Start", work_start);
@@ -182,10 +183,10 @@ where
             None,
         );
 
-        // pre-work done
+        // debug
         println!("[2-gpu/multiexp.rs] PreWorkTime: {}us", ready_time.elapsed().as_micros());
         
-        // work-1 start
+        // debug
         let work_time1 = Instant::now();
 
         kernel
@@ -199,24 +200,23 @@ where
             .arg(window_size as u32)
             .run()?;
 
-        // work-1 done
-        println!("[2-gpu/multiexp.rs] WorkTime: work-1: {}us.", work_time1.elapsed().as_micros());
 
-        // work-2 start
+        // println!(">>>> GPU work spent: {} us.", work_time1.elapsed().as_micros());
+        // work-1
+        println!("[2-gpu/multiexp.rs] WorkTime: work-1: {}us.", work_time1.elapsed().as_micros());
+        // work-2
         let work_time2 = Instant::now();
 
         let mut results = vec![<G as CurveAffine>::Projective::zero(); num_groups * num_windows];
         result_buffer.read_into(0, &mut results)?;
-        
+        // println!(" ->>>> GPU+ work spent: {} us.", now_time.elapsed().as_micros());
         // Using the algorithm below, we can calculate the final result by accumulating the results
         // of those `NUM_GROUPS` * `NUM_WINDOWS` threads.
         let mut acc = <G as CurveAffine>::Projective::zero();
         let mut bits = 0;
 
-        // work-2 done
         println!("[2-gpu/multiexp.rs] WorkTime: work-2: {}us.", work_time2.elapsed().as_micros());
 
-        // work-3 start
         let work_time3 = Instant::now();
 
         for i in 0..num_windows {
@@ -230,7 +230,6 @@ where
             bits += w; // Process the next window
         }
 
-        // work-3 done
         println!("[2-gpu/multiexp.rs] WorkTime: work-3: {}us.", work_time3.elapsed().as_micros());
 
         let gpu_done: DateTime<Utc> = Utc::now();

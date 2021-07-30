@@ -8,11 +8,9 @@ use groupy::{CurveAffine, CurveProjective};
 use log::{info, warn};
 use rayon::prelude::*;
 
-
 use super::multicore::{Waiter, Worker};
 use super::SynthesisError;
 use crate::gpu;
-// use std::time::Instant;
 
 /// An object that builds a source of bases.
 pub trait SourceBuilder<G: CurveAffine>: Send + Sync + 'static + Clone {
@@ -306,7 +304,6 @@ where
 {
     if let Some(ref mut kern) = kern {
         if let Ok(p) = kern.with(|k: &mut gpu::MultiexpKernel<G::Engine>| {
-            // println!("multiexp run by gpu..");
             let mut exps = vec![exponents[0]; exponents.len()];
             let mut n = 0;
             for (&e, d) in exponents.iter().zip(density_map.as_ref().iter()) {
@@ -329,7 +326,6 @@ where
         (f64::from(exponents.len() as u32)).ln().ceil() as u32
     };
 
-
     if let Some(query_size) = density_map.as_ref().get_query_size() {
         // If the density map has a known query size, it should not be
         // inconsistent with the number of exponents.
@@ -349,187 +345,109 @@ where
     result
 }
 
-// TODO DEBUG
-// cargo test multiexp::gpu_multiexp_test --features=gpu -- --nocapture
-#[cfg(feature = "gpu")]
+
+// cargo test multiexp::me_test --features=pairing -- --nocapture
+#[cfg(feature = "pairing")]
 #[test]
-pub fn gpu_multiexp_test(){
-    use crate::bls::Bls12;
-    use std::time::Instant;
-    use chrono::prelude::*;
-
-    let _ = env_logger::try_init();
-    gpu::dump_device_list();
-
-    const MAX_LOG_D: usize = 25;
-    const START_LOG_D: usize = 24;
-    let mut kern = Some(gpu::LockedMultiexpKernel::<Bls12>::new(MAX_LOG_D, false));
-    println!("START_LOG_D: {:?}, MAX_LOG_D: {:?}", START_LOG_D, MAX_LOG_D);
-
-    let pool = Worker::new();
-    let rng = &mut rand::thread_rng();  // sample: 0x7fb17fbc6480
-
-    let mut bases = (0..(1 << 10))
-        .map(|_| <Bls12 as crate::bls::Engine>::G1::random(rng).into_affine())
-        .collect::<Vec<_>>();
-    for _ in 10..START_LOG_D {
-        bases = [bases.clone(), bases.clone()].concat();
-    }
-
-    for log_d in START_LOG_D..=MAX_LOG_D {
-        let samples = 1 << log_d;
-        println!("Testing Multiexp for {} elements, now generate data..", samples);
-
-        let v = Arc::new(
-            (0..samples)
-                .map(|_| <Bls12 as ScalarEngine>::Fr::random(rng).into_repr())
-                .collect::<Vec<_>>()
-        );
-        // println!("random data v generated.");
-        let g = Arc::new(bases.clone());
-        // println!("random data g generated.");
-
-        let work_time = Instant::now();
-        let work_start: DateTime<Utc> = Utc::now();
-        println!("[1-multiexp.rs] {:?}, Externel call UP.. \n", work_start);
-        let _gpu = multiexp(&pool, (g.clone(), 0), FullDensity, v.clone(), &mut kern)
-            .wait()
-            .unwrap();
-
-        let work_done: DateTime<Utc> = Utc::now();
-        println!("[1-multiexp.rs] {:?}, Externel return, done. \n", work_done);
-        // println!("Result: {:?}", gpu);
-        println!("[1-multiexp.rs] work spent: {} ms.\n", work_time.elapsed().as_millis());
-
-        println!("============================");
-        bases = [bases.clone(), bases.clone()].concat();
-
-    }
-}
-
-// cargo test multiexp::c_multiexp_test --features=gpu -- --nocapture
-#[cfg(feature = "gpu")]
-#[test]
-pub fn c_multiexp_test(){
-    use crate::bls::{Bls12, Fr, FrRepr};
-    use std::time::Instant;
-    use chrono::prelude::*;
-
-    let _ = env_logger::try_init();
-    gpu::dump_device_list();
-
-    const MAX_LOG_D: usize = 2;
-    const START_LOG_D: usize = 2;
-    // tobe v's para
-    let v_repr = FrRepr([
-        0x00000000000000ffu64,
-        0x0000000000000000u64,
-        0x0000000000000000u64,
-        0x0000000000000000u64,
-    ]);
-    println!("v_repr: {:?}", v_repr);
-
-    let mut kern = Some(gpu::LockedMultiexpKernel::<Bls12>::new(MAX_LOG_D, false));
-    println!("START_LOG_D: {:?}, MAX_LOG_D: {:?}", START_LOG_D, MAX_LOG_D);
-
-    let pool = Worker::new();
-    let rng = &mut rand::thread_rng();  // sample: 0x7fb17fbc6480
-    println!("rng: {:?}", rng);
-
-    let mut bases = (0..(1 << 10))
-        .map(|_| <Bls12 as crate::bls::Engine>::G1::random(rng).into_affine())
-        .collect::<Vec<_>>();
-    for _ in 10..START_LOG_D {
-        bases = [bases.clone(), bases.clone()].concat();
-    }
-
-    for log_d in START_LOG_D..=MAX_LOG_D {
-        let samples = 1 << log_d;
-        println!("Testing Multiexp for {} elements, now generate data..", samples);
-        // paired::bls12_381::FrRepr
-        let v = Arc::new(vec![<Bls12 as ScalarEngine>::Fr::zero().into_repr(); samples]);
-        println!("v: {:?}", v);
-
-        v[0] = Fr::from_repr(v_repr).into_repr();
-        // v[0] = v_repr;
-        println!("new v:{:?}", v);
-
-        let g = Arc::new(bases.clone());
-
-        let work_time = Instant::now();
-        let work_start: DateTime<Utc> = Utc::now();
-        println!("[1-multiexp.rs] {:?}, Externel call UP.. \n", work_start);
-        let _gpu = multiexp(&pool, (g.clone(), 0), FullDensity, v.clone(), &mut kern)
-            .wait()
-            .unwrap();
-
-        let work_done: DateTime<Utc> = Utc::now();
-        println!("[1-multiexp.rs] {:?}, Externel return, done. \n", work_done);
-        // println!("Result: {:?}", gpu);
-        println!("[1-multiexp.rs] work spent: {} ms.\n", work_time.elapsed().as_millis());
-
-        println!("============================");
-        bases = [bases.clone(), bases.clone()].concat();
-    }
-}
-
-// cargo test multiexp::test_with_bls12 --features=pairing -- --nocapture
-#[cfg(any(feature = "pairing", feature = "blst"))]
-#[test]
-fn test_with_bls12() {
+fn me_test(){
 
     fn naive_multiexp<G: CurveAffine>(
         bases: Arc<Vec<G>>,
         exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
     ) -> G::Projective {
         assert_eq!(bases.len(), exponents.len());
-  
+
         let mut acc = G::Projective::zero();
         for (base, exp) in bases.iter().zip(exponents.iter()) {
             acc.add_assign(&base.mul(*exp));
         }
+
         acc
     }
 
     use crate::bls::{Bls12, Engine};
     use rand;
-    // const SAMPLES: usize = 1 << 27;
-    // const SAMPLES: usize =  16 * 1024 * 1024;  // 16 M
-    const SAMPLES: usize =  8092;           // 1.6 M
-    println!("Sample size: {:?}", SAMPLES);
-
-    // debug: use gpu?
-    // let log_d = 10;
-    // let mut kern = Some(gpu::LockedMultiexpKernel::<Bls12>::new(log_d, false));
+    const SAMPLES: usize = 1 << 14;
 
     let rng = &mut rand::thread_rng();
-
     let v = Arc::new(
         (0..SAMPLES)
             .map(|_| <Bls12 as ScalarEngine>::Fr::random(rng).into_repr())
             .collect::<Vec<_>>(),
     );
-
     let g = Arc::new(
         (0..SAMPLES)
             .map(|_| <Bls12 as Engine>::G1::random(rng).into_affine())
             .collect::<Vec<_>>(),
     );
 
-
     let now = std::time::Instant::now();
     let naive = naive_multiexp(g.clone(), v.clone());
     println!("Naive: {}", now.elapsed().as_millis());
-    println!("What is Naive: {:}", naive);
+    // println!("What is Naive: {:?}", naive);
 
     let now = std::time::Instant::now();
     let pool = Worker::new();
+
     let fast = multiexp(&pool, (g, 0), FullDensity, v, &mut None)
         .wait()
         .unwrap();
 
     println!("Fast: {}", now.elapsed().as_millis());
-    println!("What is Fast: {:}", fast);
+    // println!("What is Fast: {:?}", fast);
+
+    assert_eq!(naive, fast); 
+
+}
+
+
+
+// cargo test multiexp::test_with_bls12 --features=pairing -- --nocapture
+#[cfg(any(feature = "pairing", feature = "blst"))]
+#[test]
+fn test_with_bls12() {
+    fn naive_multiexp<G: CurveAffine>(
+        bases: Arc<Vec<G>>,
+        exponents: Arc<Vec<<G::Scalar as PrimeField>::Repr>>,
+    ) -> G::Projective {
+        assert_eq!(bases.len(), exponents.len());
+
+        let mut acc = G::Projective::zero();
+        for (base, exp) in bases.iter().zip(exponents.iter()) {
+            acc.add_assign(&base.mul(*exp));
+        }
+
+        acc
+    }
+
+    use crate::bls::{Bls12, Engine};
+    use rand;
+    const SAMPLES: usize = 1 << 14;
+
+    let rng = &mut rand::thread_rng();
+    let v = Arc::new(
+        (0..SAMPLES)
+            .map(|_| <Bls12 as ScalarEngine>::Fr::random(rng).into_repr())
+            .collect::<Vec<_>>(),
+    );
+    let g = Arc::new(
+        (0..SAMPLES)
+            .map(|_| <Bls12 as Engine>::G1::random(rng).into_affine())
+            .collect::<Vec<_>>(),
+    );
+
+    let now = std::time::Instant::now();
+    let naive = naive_multiexp(g.clone(), v.clone());
+    println!("Naive: {}", now.elapsed().as_millis());
+
+    let now = std::time::Instant::now();
+    let pool = Worker::new();
+
+    let fast = multiexp(&pool, (g, 0), FullDensity, v, &mut None)
+        .wait()
+        .unwrap();
+
+    println!("Fast: {}", now.elapsed().as_millis());
 
     assert_eq!(naive, fast); 
 }
@@ -550,8 +468,6 @@ where
     }
 }
 
-
-// cargo test multiexp::gpu_multiexp_consistency --features=gpu -- --nocapture
 #[cfg(feature = "gpu")]
 #[test]
 pub fn gpu_multiexp_consistency() {
@@ -561,10 +477,9 @@ pub fn gpu_multiexp_consistency() {
     let _ = env_logger::try_init();
     gpu::dump_device_list();
 
-    const MAX_LOG_D: usize = 20;
+    const MAX_LOG_D: usize = 16;
     const START_LOG_D: usize = 10;
     let mut kern = Some(gpu::LockedMultiexpKernel::<Bls12>::new(MAX_LOG_D, false));
-    println!("MAX_LOG_D: {:?}", MAX_LOG_D);
     let pool = Worker::new();
 
     let rng = &mut rand::thread_rng();
@@ -580,7 +495,7 @@ pub fn gpu_multiexp_consistency() {
         let g = Arc::new(bases.clone());
 
         let samples = 1 << log_d;
-        println!("The log_d is: {:?}, Testing Multiexp for {} elements... ", log_d, samples);
+        println!("Testing Multiexp for {} elements...", samples);
 
         let v = Arc::new(
             (0..samples)

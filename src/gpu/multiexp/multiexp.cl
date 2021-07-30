@@ -6,6 +6,10 @@
  * window. The GPU kernel not only assigns a thread to each window but also
  * divides the bases into several groups which highly increases the number of
  * threads running in parallel for calculating a multiexp instance.
+ * uint n: 2M          
+ * uint num_groups: 600
+ * uint num_windows: 29 
+ * uint window_size: 9
  */
 
 __kernel void POINT_bellman_multiexp(
@@ -13,7 +17,7 @@ __kernel void POINT_bellman_multiexp(
     __global POINT_projective *buckets,
     __global POINT_projective *results,
     __global EXPONENT *exps,
-    uint n,
+    uint n,          
     uint num_groups,
     uint num_windows,
     uint window_size) {
@@ -50,7 +54,7 @@ __kernel void POINT_bellman_multiexp(
       // 511 is chosen because it's half of the maximum bucket len, but
       // any other number works... Bigger indices seems to be better...
       if(ind == 511) buckets[510] = POINT_add_mixed(buckets[510], bases[i]);
-      else if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
+      else if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]); 
     #else
       if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
     #endif
