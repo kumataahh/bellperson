@@ -450,7 +450,7 @@ pub fn c_multiexp_test(){
         let v = Arc::new(vec![<Bls12 as ScalarEngine>::Fr::zero().into_repr(); samples]);
         println!("v: {:?}", v);
 
-        v[0] = Fr::from_repr(v_repr).into_repr();
+        // v[0] = Fr::from_repr(v_repr).into_repr();
         // v[0] = v_repr;
         println!("new v:{:?}", v);
 
@@ -497,10 +497,6 @@ fn test_with_bls12() {
     // const SAMPLES: usize =  16 * 1024 * 1024;  // 16 M
     const SAMPLES: usize =  8092;           // 1.6 M
     println!("Sample size: {:?}", SAMPLES);
-
-    // debug: use gpu?
-    // let log_d = 10;
-    // let mut kern = Some(gpu::LockedMultiexpKernel::<Bls12>::new(log_d, false));
 
     let rng = &mut rand::thread_rng();
 
