@@ -84,4 +84,4 @@ harness = false
 
 
 [patch.crates-io]
-paired = { path="/home/asdf/filecoin/bellperson/paired" }
+paired = { path="/root/filecoin-c2/bellperson/paired" }

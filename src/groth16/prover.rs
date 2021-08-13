@@ -425,6 +425,8 @@ where
 
     // debug h_s
     println!("[DEBUG-prover.rs] h_s spent: {}", now.elapsed().as_millis());
+    // panic!("kill that shit rust, motherfuck");
+
     // let utc_hs_end: DateTime<Utc> = Utc::now();
     // println!("Now Time: {:?}, [DEBUG-prover.rs] h_s end. \n", utc_hs_end);  
 
