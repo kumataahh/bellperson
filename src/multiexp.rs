@@ -329,7 +329,6 @@ where
         (f64::from(exponents.len() as u32)).ln().ceil() as u32
     };
 
-
     if let Some(query_size) = density_map.as_ref().get_query_size() {
         // If the density map has a known query size, it should not be
         // inconsistent with the number of exponents.
@@ -495,7 +494,7 @@ fn test_with_bls12() {
     use rand;
     // const SAMPLES: usize = 1 << 27;
     // const SAMPLES: usize =  16 * 1024 * 1024;  // 16 M
-    const SAMPLES: usize =  8092;           // 1.6 M
+    const SAMPLES: usize = 8092;           // 1.6 M
     println!("Sample size: {:?}", SAMPLES);
 
     let rng = &mut rand::thread_rng();
@@ -547,7 +546,7 @@ where
 }
 
 
-// cargo test multiexp::gpu_multiexp_consistency --features=gpu -- --nocapture
+// sudo cargo test multiexp::gpu_multiexp_consistency --features=gpu -- --nocapture
 #[cfg(feature = "gpu")]
 #[test]
 pub fn gpu_multiexp_consistency() {
@@ -601,6 +600,7 @@ pub fn gpu_multiexp_consistency() {
         println!("Speedup: x{}", cpu_dur as f32 / gpu_dur as f32);
 
         assert_eq!(cpu, gpu);
+        println!("cpu:gpu consistency check pass.");
 
         println!("============================");
 

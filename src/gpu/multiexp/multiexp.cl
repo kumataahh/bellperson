@@ -53,13 +53,17 @@ __kernel void POINT_bellman_multiexp(
       // tremendously faster!
       // 511 is chosen because it's half of the maximum bucket len, but
       // any other number works... Bigger indices seems to be better...
-      if(ind == 511) buckets[510] = POINT_add_mixed(buckets[510], bases[i]);
-      else if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]); 
+      if(ind == 511) {
+        buckets[510] = POINT_add_mixed(buckets[510], bases[i]);
+      }else if(ind--) {
+        buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]); 
+      }
     #else
-      if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
+      if(ind--){
+        buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
+      }
     #endif
   }
-
   // Summation by parts
   // e.g. 3a + 2b + 1c = a +
   //                    (a) + b +
