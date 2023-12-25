@@ -112,10 +112,7 @@ where
         let best_n = calc_best_chunk_size(MAX_WINDOW_SIZE, core_count, exp_bits); // 14977997
         let n = std::cmp::min(max_n, best_n);
 
-        println!("exp_bits:{:?}, core_count:{:?}, mem:{:?}, max_n:{:?}, best_n:{:?}, n:{:?}", exp_bits, core_count, mem, max_n, best_n, n);
-        // println!("// begin OpenCL Multiexp");
-        // println!("{}", src);
-        // println!("// end OpenCL Multiexp");
+        // println!("exp_bits:{:?}, core_count:{:?}, mem:{:?}, max_n:{:?}, best_n:{:?}, n:{:?}", exp_bits, core_count, mem, max_n, best_n, n);
 
         Ok(SingleMultiexpKernel {
             program: opencl::Program::from_opencl(d, &src)?,
@@ -222,16 +219,16 @@ where
         // work-3 start
         // let work_time3 = Instant::now();
 
-        // for i in 0..num_windows {
-        //     let w = std::cmp::min(window_size, exp_bits - bits);
-        //     for _ in 0..w {
-        //         acc.double();
-        //     }
-        //     for g in 0..num_groups {
-        //         acc.add_assign(&results[g * num_windows + i]);
-        //     }
-        //     bits += w; // Process the next window
-        // }
+        for i in 0..num_windows {
+            let w = std::cmp::min(window_size, exp_bits - bits);
+            for _ in 0..w {
+                acc.double();
+            }
+            for g in 0..num_groups {
+                acc.add_assign(&results[g * num_windows + i]);
+            }
+            bits += w; // Process the next window
+        }
 
         // work-3 done
         // println!("[2-gpu/multiexp.rs] WorkTime: work-3: {}us.", work_time3.elapsed().as_micros());
